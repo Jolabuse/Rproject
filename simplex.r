@@ -1,3 +1,5 @@
+library(stringr)
+
 tbl = read.delim(file.choose(),header = FALSE,sep=' ') #store in a table the input file
 
 nbNonBase <- ncol(tbl)-2
@@ -178,10 +180,13 @@ while(continueCondition(tbl)==0){ #first simplex resolution
   slct <- selection(tbl)
   tbl<-gauss_pivot(tbl,slct[1],slct[2])
   tbl<-renameRows(tbl)
-  print(tbl)
+  if(doubleSimplex == 0){
+    print(tbl)
+  }
 }
 
 if(doubleSimplex == 1){#erase artificial variables
+  print(tbl)
   tbl <- cbind(tbl[,1:(ncol(tbl)-1-cptNegBase)],tbl[,ncol(tbl)])
   tbl[nrow(tbl),] <- 0
   nonBase <- nonBaseDetection(tbl)
@@ -191,16 +196,29 @@ if(doubleSimplex == 1){#erase artificial variables
     indBase <- which(posBases == ind)
     tbl[nrow(tbl),nonBase] <- tbl[nrow(tbl),nonBase] - C[1,ind] * tbl[indBase[1],nonBase]
   }
-  print(tbl)
-  
+  colnames(tbl)[ncol(tbl)]<-"B"
   print("Second simplex : ")
+  print(tbl)
   while(continueCondition(tbl)==0){ #second simplex resolution
     slct <- selection(tbl)
     tbl<-gauss_pivot(tbl,slct[1],slct[2])
     tbl<-renameRows(tbl)
-    print(tbl)
   }
+  print(tbl)
 }
 
+printResult <-function(tbl,nbNonBase){
+  printVar <- "("
+  for (ind in c(1:nbNonBase)) {
+    printVar<-paste(printVar,"x",sep=",")
+    printVar<-paste(printVar,ind,"=",sep="")
+    ind2 <- which(tbl[,ind] == 1)
+    valSol<-tbl[ind2,ncol(tbl)]
+    printVar<-paste(printVar,valSol,sep="")
+  }
+  str_sub(printVar,2,2)<-""
+  printVar<-paste(printVar,")",sep="")
+  return(printVar)
+}
 
-
+print(printResult(tbl,nbNonBase))
