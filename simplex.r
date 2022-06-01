@@ -126,7 +126,15 @@ renameRows <- function(tbl) { # rename the rows
   return(tbl)
 }
 
-
+renameColumns <- function(tbl) {
+  names <- c() # rename the col & rows
+  for (ind in c(1:(ncol(tbl) - 1))) {
+    names <- append(names, paste("x", ind, sep = ""))
+  }
+  names <- append(names, "B")
+  colnames(tbl) <- names
+  return(tbl)
+}
 
 continueCondition <- function(tbl) { # check if only negative in C
   C <- tbl[nrow(tbl), 1:(ncol(tbl) - 1)]
@@ -161,6 +169,33 @@ gauss_pivot <- function(mat, pivotLine, pivotColumn) {
   return(mat)
 }
 
+twoPhaseSimplex <- function(tbl, cptNegBase, nbNonBase, C) {
+  print(round(tbl, digits = 3))
+  if (tbl[nrow(tbl), ncol(tbl)] == 0) {
+    tbl <- cbind(tbl[, 1:(ncol(tbl) - 1 - cptNegBase)], tbl[, ncol(tbl)])
+    tbl[nrow(tbl), ] <- 0
+    nonBase <- nonBaseDetection(tbl)
+    nonBase <- append(nonBase, ncol(tbl))
+    for (ind in c(1:nbNonBase)) {
+      posBases <- posBaseDetection(tbl)
+      indBase <- which(posBases == ind)
+      tbl[nrow(tbl), nonBase] <- tbl[nrow(tbl), nonBase] - C[1, ind] * tbl[indBase[1], nonBase]
+    }
+    colnames(tbl)[ncol(tbl)] <- "B"
+    print("Second simplex : ")
+    print(round(tbl, digits = 3))
+    while (continueCondition(tbl) == 0) { # second simplex resolution
+      slct <- selection(tbl)
+      tbl <- gauss_pivot(tbl, slct[1], slct[2])
+      tbl <- renameRows(tbl)
+    }
+    print(round(tbl, digits = 3))
+    print(printResult(tbl, nbNonBase))
+  } else {
+    print("There are no results")
+  }
+  return(tbl)
+}
 simplex <- function(tbl) {
   tbl <- read.delim(file.choose(), header = FALSE, sep = " ") # store in a table the input file
 
@@ -185,14 +220,8 @@ simplex <- function(tbl) {
       tbl[nrow(tbl), ] <- tbl[nrow(tbl), ] + tbl[ind, ]
     }
   }
-  names <- c() # rename the col & rows
-  for (ind in c(1:(ncol(tbl) - 1))) {
-    names <- append(names, paste("x", ind, sep = ""))
-  }
-  names <- append(names, "B")
-  colnames(tbl) <- names
+  tbl <- renameColumns(tbl)
   tbl <- renameRows(tbl)
-
   print(round(tbl, digits = 3))
 
   print("First simplex resolution")
@@ -206,30 +235,7 @@ simplex <- function(tbl) {
     }
   }
   if (doubleSimplex == 1) { # erase artificial variables
-    print(round(tbl, digits = 3))
-    if (tbl[nrow(tbl), ncol(tbl)] == 0) {
-      tbl <- cbind(tbl[, 1:(ncol(tbl) - 1 - cptNegBase)], tbl[, ncol(tbl)])
-      tbl[nrow(tbl), ] <- 0
-      nonBase <- nonBaseDetection(tbl)
-      nonBase <- append(nonBase, ncol(tbl))
-      for (ind in c(1:nbNonBase)) {
-        posBases <- posBaseDetection(tbl)
-        indBase <- which(posBases == ind)
-        tbl[nrow(tbl), nonBase] <- tbl[nrow(tbl), nonBase] - C[1, ind] * tbl[indBase[1], nonBase]
-      }
-      colnames(tbl)[ncol(tbl)] <- "B"
-      print("Second simplex : ")
-      print(round(tbl, digits = 3))
-      while (continueCondition(tbl) == 0) { # second simplex resolution
-        slct <- selection(tbl)
-        tbl <- gauss_pivot(tbl, slct[1], slct[2])
-        tbl <- renameRows(tbl)
-      }
-      print(round(tbl, digits = 3))
-      print(printResult(tbl, nbNonBase))
-    } else {
-      print("There are no results")
-    }
+    tbl <- twoPhaseSimplex(tbl, cptNegBase, nbNonBase, C)
   } else {
     print(printResult(tbl, nbNonBase))
   }
