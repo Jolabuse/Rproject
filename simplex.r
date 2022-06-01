@@ -1,8 +1,24 @@
 library(stringr)
 
-tbl <- read.delim(file.choose(), header = FALSE, sep = " ") # store in a table the input file
-
-nbNonBase <- ncol(tbl) - 2
+createTable <- function(tbl) {
+  for (ind in c(1:nrow(tbl))) { # create the table
+    if (tbl[ind, (ncol(tbl) - 1)] == -1) {
+      if (tbl[ind, (ncol(tbl))] > 0) {
+        tbl <- addBaseCol(tbl, ind)
+      } else {
+        tbl <- addInvNegBaseCol(tbl, ind)
+      }
+    }
+    if (tbl[ind, (ncol(tbl) - 1)] == 1) {
+      if (tbl[ind, (ncol(tbl))] < 0) {
+        tbl <- addInvBaseCol(tbl, ind)
+      } else {
+        tbl <- addNegBaseCol(tbl, ind)
+      }
+    }
+  }
+  return(tbl)
+}
 
 addBaseCol <- function(tbl, ind) { # insert a base variable for the ind row at the end of A
   bCol <- matrix(0, nrow(tbl), 1)
@@ -38,34 +54,13 @@ printResult <- function(tbl, nbNonBase) {
     printVar <- paste(printVar, "x", sep = ",")
     printVar <- paste(printVar, ind, "=", sep = "")
     ind2 <- which(tbl[, ind] == 1)
-    valSol <- round(tbl[ind2, ncol(tbl)],3)
+    valSol <- round(tbl[ind2, ncol(tbl)], 3)
     printVar <- paste(printVar, valSol, sep = "")
   }
   str_sub(printVar, 2, 2) <- ""
   printVar <- paste(printVar, ")", sep = "")
   return(printVar)
 }
-
-
-for (ind in c(1:nrow(tbl))) { # create the table
-  if (tbl[ind, (ncol(tbl) - 1)] == -1) {
-    if (tbl[ind, (ncol(tbl))] > 0) {
-      tbl <- addBaseCol(tbl, ind)
-    } else {
-      tbl<-addInvNegBaseCol(tbl,ind)
-    }
-  }
-  if (tbl[ind, (ncol(tbl) - 1)] == 1) {
-    if (tbl[ind, (ncol(tbl))] < 0) {
-      tbl <- addInvBaseCol(tbl, ind)
-    } else {
-      tbl <- addNegBaseCol(tbl, ind)
-    }
-  }
-}
-
-tbl <- cbind(tbl[, 1:(ncol(tbl) - 2)], tbl[, (ncol(tbl))]) # erase the inequality column
-tbl[nrow(tbl), ncol(tbl)] <- 0 # put the 0 for the Z-0
 
 
 posBaseDetection <- function(tbl) {
@@ -112,9 +107,6 @@ allBaseDetection <- function(tbl) {
   return(bases)
 }
 
-allBasesInd <- allBaseDetection(tbl) # find the base variables
-
-
 addArtVar <- function(tbl, ind) { # add artificial variable for an index
   bCol <- matrix(0, nrow(tbl), 1)
   bCol[ind, 1] <- 1
@@ -122,23 +114,6 @@ addArtVar <- function(tbl, ind) { # add artificial variable for an index
   tbl[nrow(tbl), ncol(tbl) - 1] <- -1
   return(tbl)
 }
-
-doubleSimplex <- 0
-cptNegBase <- 0
-
-for (ind in (1:length(allBasesInd))) { # add all artificial variables and set up C
-  if (tbl[ind, allBasesInd[ind]] == -1) {
-    if (doubleSimplex == 0) {
-      C <- tbl[nrow(tbl), ]
-      tbl[nrow(tbl), ] <- 0
-    }
-    doubleSimplex <- 1
-    cptNegBase <- cptNegBase + 1
-    tbl <- addArtVar(tbl, ind)
-    tbl[nrow(tbl), ] <- tbl[nrow(tbl), ] + tbl[ind, ]
-  }
-}
-
 
 renameRows <- function(tbl) { # rename the rows
   names <- c()
@@ -151,18 +126,15 @@ renameRows <- function(tbl) { # rename the rows
   return(tbl)
 }
 
-
-names <- c() # rename the col & rows
-for (ind in c(1:(ncol(tbl) - 1))) {
-  names <- append(names, paste("x", ind, sep = ""))
+renameColumns <- function(tbl) {
+  names <- c() # rename the col & rows
+  for (ind in c(1:(ncol(tbl) - 1))) {
+    names <- append(names, paste("x", ind, sep = ""))
+  }
+  names <- append(names, "B")
+  colnames(tbl) <- names
+  return(tbl)
 }
-names <- append(names, "B")
-colnames(tbl) <- names
-tbl <- renameRows(tbl)
-
-print(round(tbl,digits = 3))
-
-
 
 continueCondition <- function(tbl) { # check if only negative in C
   C <- tbl[nrow(tbl), 1:(ncol(tbl) - 1)]
@@ -190,29 +162,16 @@ gauss_pivot <- function(mat, pivotLine, pivotColumn) {
   mat[pivotLine, ] <- mat[pivotLine, ] / n
   for (i in 1:nrow(mat)) {
     if (pivotLine != i) {
-      mat[i, ] <- round(mat[i, ] - (mat[i, pivotColumn] * mat[pivotLine, ]),digits=10)
+      mat[i, ] <- round(mat[i, ] - (mat[i, pivotColumn] * mat[pivotLine, ]), digits = 10)
     }
   }
-  
+
   return(mat)
 }
 
-print("First simplex resolution")
-
-while (continueCondition(tbl) == 0) { # first simplex resolution
-  slct <- selection(tbl)
-  tbl <- gauss_pivot(tbl, slct[1], slct[2])
-  tbl <- renameRows(tbl)
-  if (doubleSimplex == 0) {
-    print(round(tbl,digits = 3))
-  }
-}
-
-
-
-if (doubleSimplex == 1) {# erase artificial variables
-  print(round(tbl,digits = 3))
-  if(tbl[nrow(tbl),ncol(tbl)]==0){
+twoPhaseSimplex <- function(tbl, cptNegBase, nbNonBase, C) {
+  print(round(tbl, digits = 3))
+  if (tbl[nrow(tbl), ncol(tbl)] == 0) {
     tbl <- cbind(tbl[, 1:(ncol(tbl) - 1 - cptNegBase)], tbl[, ncol(tbl)])
     tbl[nrow(tbl), ] <- 0
     nonBase <- nonBaseDetection(tbl)
@@ -224,21 +183,62 @@ if (doubleSimplex == 1) {# erase artificial variables
     }
     colnames(tbl)[ncol(tbl)] <- "B"
     print("Second simplex : ")
-    print(round(tbl,digits = 3))
+    print(round(tbl, digits = 3))
     while (continueCondition(tbl) == 0) { # second simplex resolution
       slct <- selection(tbl)
       tbl <- gauss_pivot(tbl, slct[1], slct[2])
       tbl <- renameRows(tbl)
     }
-    print(round(tbl,digits = 3))
+    print(round(tbl, digits = 3))
     print(printResult(tbl, nbNonBase))
-  }
-  else{
+  } else {
     print("There are no results")
   }
-}else{
-  print(printResult(tbl, nbNonBase))
+  return(tbl)
+}
+simplex <- function(tbl) {
+  tbl <- read.delim(file.choose(), header = FALSE, sep = " ") # store in a table the input file
+
+  nbNonBase <- ncol(tbl) - 2
+
+  tbl <- createTable(tbl)
+
+  tbl <- cbind(tbl[, 1:(ncol(tbl) - 2)], tbl[, (ncol(tbl))]) # erase the inequality column
+  tbl[nrow(tbl), ncol(tbl)] <- 0 # put the 0 for the Z-0
+  doubleSimplex <- 0
+  cptNegBase <- 0
+  allBasesInd <- allBaseDetection(tbl) # find the base variables
+  for (ind in (1:length(allBasesInd))) { # add all artificial variables and set up C
+    if (tbl[ind, allBasesInd[ind]] == -1) {
+      if (doubleSimplex == 0) {
+        C <- tbl[nrow(tbl), ]
+        tbl[nrow(tbl), ] <- 0
+      }
+      doubleSimplex <- 1
+      cptNegBase <- cptNegBase + 1
+      tbl <- addArtVar(tbl, ind)
+      tbl[nrow(tbl), ] <- tbl[nrow(tbl), ] + tbl[ind, ]
+    }
+  }
+  tbl <- renameColumns(tbl)
+  tbl <- renameRows(tbl)
+  print(round(tbl, digits = 3))
+
+  print("First simplex resolution")
+
+  while (continueCondition(tbl) == 0) { # first simplex resolution
+    slct <- selection(tbl)
+    tbl <- gauss_pivot(tbl, slct[1], slct[2])
+    tbl <- renameRows(tbl)
+    if (doubleSimplex == 0) {
+      print(round(tbl, digits = 3))
+    }
+  }
+  if (doubleSimplex == 1) { # erase artificial variables
+    tbl <- twoPhaseSimplex(tbl, cptNegBase, nbNonBase, C)
+  } else {
+    print(printResult(tbl, nbNonBase))
+  }
 }
 
-
-
+simplex()
