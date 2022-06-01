@@ -196,6 +196,7 @@ twoPhaseSimplex <- function(tbl, cptNegBase, nbNonBase, C) {
   }
   return(tbl)
 }
+
 simplex <- function(tbl) {
   tbl <- read.delim(file.choose(), header = FALSE, sep = " ") # store in a table the input file
 
