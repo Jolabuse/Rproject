@@ -10,7 +10,7 @@ addBaseCol <- function(tbl, ind) { # insert a base variable for the ind row at t
   tbl <- cbind(tbl[, 1:(ncol(tbl) - 2)], bCol, tbl[, (ncol(tbl) - 1):ncol(tbl)])
 }
 
-addNegBaseCol <- function(tbl, ind) { # insert a base variable for the ind row at the end of A
+addNegBaseCol <- function(tbl, ind) { # insert a neg base variable for the ind row at the end of A
   bCol <- matrix(0, nrow(tbl), 1)
   bCol[ind, 1] <- -1
   tbl <- cbind(tbl[, 1:(ncol(tbl) - 2)], bCol, tbl[, (ncol(tbl) - 1):ncol(tbl)])
@@ -24,10 +24,36 @@ addInvBaseCol <- function(tbl, ind) { # invert the values of the ind row and ins
   tbl <- cbind(tbl[, 1:(ncol(tbl) - 2)], bCol, tbl[, (ncol(tbl) - 1):ncol(tbl)])
 }
 
+addInvNegBaseCol <- function(tbl, ind) { # invert the values of the ind row and insert a neg base variable for it at the end of A
+  tbl[ind, 1:(ncol(tbl) - 2)] <- tbl[ind, 1:(ncol(tbl) - 2)] * -1
+  tbl[ind, ncol(tbl)] <- tbl[ind, ncol(tbl)] * -1
+  bCol <- matrix(0, nrow(tbl), 1)
+  bCol[ind, 1] <- -1
+  tbl <- cbind(tbl[, 1:(ncol(tbl) - 2)], bCol, tbl[, (ncol(tbl) - 1):ncol(tbl)])
+}
+
+printResult <- function(tbl, nbNonBase) {
+  printVar <- "("
+  for (ind in c(1:nbNonBase)) {
+    printVar <- paste(printVar, "x", sep = ",")
+    printVar <- paste(printVar, ind, "=", sep = "")
+    ind2 <- which(tbl[, ind] == 1)
+    valSol <- round(tbl[ind2, ncol(tbl)],3)
+    printVar <- paste(printVar, valSol, sep = "")
+  }
+  str_sub(printVar, 2, 2) <- ""
+  printVar <- paste(printVar, ")", sep = "")
+  return(printVar)
+}
+
 
 for (ind in c(1:nrow(tbl))) { # create the table
   if (tbl[ind, (ncol(tbl) - 1)] == -1) {
-    tbl <- addBaseCol(tbl, ind)
+    if (tbl[ind, (ncol(tbl))] > 0) {
+      tbl <- addBaseCol(tbl, ind)
+    } else {
+      tbl<-addInvNegBaseCol(tbl,ind)
+    }
   }
   if (tbl[ind, (ncol(tbl) - 1)] == 1) {
     if (tbl[ind, (ncol(tbl))] < 0) {
@@ -40,7 +66,7 @@ for (ind in c(1:nrow(tbl))) { # create the table
 
 tbl <- cbind(tbl[, 1:(ncol(tbl) - 2)], tbl[, (ncol(tbl))]) # erase the inequality column
 tbl[nrow(tbl), ncol(tbl)] <- 0 # put the 0 for the Z-0
-tbl
+
 
 posBaseDetection <- function(tbl) {
   bases <- vector(length = nrow(tbl) - 1)
@@ -99,7 +125,6 @@ addArtVar <- function(tbl, ind) { # add artificial variable for an index
 
 doubleSimplex <- 0
 cptNegBase <- 0
-print(tbl)
 
 for (ind in (1:length(allBasesInd))) { # add all artificial variables and set up C
   if (tbl[ind, allBasesInd[ind]] == -1) {
@@ -114,7 +139,6 @@ for (ind in (1:length(allBasesInd))) { # add all artificial variables and set up
   }
 }
 
-print(tbl)
 
 renameRows <- function(tbl) { # rename the rows
   names <- c()
@@ -136,7 +160,7 @@ names <- append(names, "B")
 colnames(tbl) <- names
 tbl <- renameRows(tbl)
 
-print(tbl)
+print(round(tbl,digits = 3))
 
 
 
@@ -166,10 +190,10 @@ gauss_pivot <- function(mat, pivotLine, pivotColumn) {
   mat[pivotLine, ] <- mat[pivotLine, ] / n
   for (i in 1:nrow(mat)) {
     if (pivotLine != i) {
-      mat[i, ] <- mat[i, ] - (mat[i, pivotColumn] * mat[pivotLine, ])
+      mat[i, ] <- round(mat[i, ] - (mat[i, pivotColumn] * mat[pivotLine, ]),digits=10)
     }
   }
-
+  
   return(mat)
 }
 
@@ -180,44 +204,41 @@ while (continueCondition(tbl) == 0) { # first simplex resolution
   tbl <- gauss_pivot(tbl, slct[1], slct[2])
   tbl <- renameRows(tbl)
   if (doubleSimplex == 0) {
-    print(tbl)
+    print(round(tbl,digits = 3))
   }
 }
 
-if (doubleSimplex == 1) { # erase artificial variables
-  print(tbl)
-  tbl <- cbind(tbl[, 1:(ncol(tbl) - 1 - cptNegBase)], tbl[, ncol(tbl)])
-  tbl[nrow(tbl), ] <- 0
-  nonBase <- nonBaseDetection(tbl)
-  nonBase <- append(nonBase, ncol(tbl))
-  for (ind in c(1:nbNonBase)) {
-    posBases <- posBaseDetection(tbl)
-    indBase <- which(posBases == ind)
-    tbl[nrow(tbl), nonBase] <- tbl[nrow(tbl), nonBase] - C[1, ind] * tbl[indBase[1], nonBase]
+
+
+if (doubleSimplex == 1) {# erase artificial variables
+  print(round(tbl,digits = 3))
+  if(tbl[nrow(tbl),ncol(tbl)]==0){
+    tbl <- cbind(tbl[, 1:(ncol(tbl) - 1 - cptNegBase)], tbl[, ncol(tbl)])
+    tbl[nrow(tbl), ] <- 0
+    nonBase <- nonBaseDetection(tbl)
+    nonBase <- append(nonBase, ncol(tbl))
+    for (ind in c(1:nbNonBase)) {
+      posBases <- posBaseDetection(tbl)
+      indBase <- which(posBases == ind)
+      tbl[nrow(tbl), nonBase] <- tbl[nrow(tbl), nonBase] - C[1, ind] * tbl[indBase[1], nonBase]
+    }
+    colnames(tbl)[ncol(tbl)] <- "B"
+    print("Second simplex : ")
+    print(round(tbl,digits = 3))
+    while (continueCondition(tbl) == 0) { # second simplex resolution
+      slct <- selection(tbl)
+      tbl <- gauss_pivot(tbl, slct[1], slct[2])
+      tbl <- renameRows(tbl)
+    }
+    print(round(tbl,digits = 3))
+    print(printResult(tbl, nbNonBase))
   }
-  colnames(tbl)[ncol(tbl)] <- "B"
-  print("Second simplex : ")
-  print(tbl)
-  while (continueCondition(tbl) == 0) { # second simplex resolution
-    slct <- selection(tbl)
-    tbl <- gauss_pivot(tbl, slct[1], slct[2])
-    tbl <- renameRows(tbl)
+  else{
+    print("There are no results")
   }
-  print(tbl)
+}else{
+  print(printResult(tbl, nbNonBase))
 }
 
-printResult <- function(tbl, nbNonBase) {
-  printVar <- "("
-  for (ind in c(1:nbNonBase)) {
-    printVar <- paste(printVar, "x", sep = ",")
-    printVar <- paste(printVar, ind, "=", sep = "")
-    ind2 <- which(tbl[, ind] == 1)
-    valSol <- tbl[ind2, ncol(tbl)]
-    printVar <- paste(printVar, valSol, sep = "")
-  }
-  str_sub(printVar, 2, 2) <- ""
-  printVar <- paste(printVar, ")", sep = "")
-  return(printVar)
-}
 
-print(printResult(tbl, nbNonBase))
+
