@@ -49,7 +49,7 @@ addInvNegBaseCol <- function(tbl, ind) { # invert the values of the ind row and 
 }
 
 
-posBaseDetection <- function(tbl) {
+positiveBaseDetection <- function(tbl) {
   bases <- vector(length = nrow(tbl) - 1)
   sum1 <- colSums(tbl[, 1:(ncol(tbl) - 1)])
   sum1 <- which(sum1 == 1)
@@ -103,7 +103,7 @@ addArtVar <- function(tbl, ind) { # add artificial variable for an index
 
 renameRows <- function(tbl) { # rename the rows
   names <- c()
-  posBases <- posBaseDetection(tbl)
+  posBases <- positiveBaseDetection(tbl)
   for (val in posBases) {
     names <- append(names, paste("x", val, sep = ""))
   }
@@ -143,6 +143,14 @@ selection <- function(tbl) { # we select the biggest in C and the min positive i
   c(minB, maxC)
 }
 
+selectFromCol <- function(tbl, ind) {
+  B <- tbl[1:(nrow(tbl) - 1), ncol(tbl)]
+  cMaxC <- tbl[1:(nrow(tbl) - 1), ind]
+  BcMaxC <- B / cMaxC
+  minB <- head(which(BcMaxC == min(BcMaxC[BcMaxC > 0])), 1)
+  c(minB, ind)
+}
+
 gauss_pivot <- function(mat, pivotLine, pivotColumn) {
   n <- mat[pivotLine, pivotColumn]
   mat[pivotLine, ] <- mat[pivotLine, ] / n
@@ -151,8 +159,21 @@ gauss_pivot <- function(mat, pivotLine, pivotColumn) {
       mat[i, ] <- round(mat[i, ] - (mat[i, pivotColumn] * mat[pivotLine, ]), digits = 10)
     }
   }
-
   return(mat)
+}
+
+printResult <- function(tbl, nbNonBase) {
+  printVar <- "("
+  for (ind in c(1:nbNonBase)) {
+    printVar <- paste(printVar, "x", sep = ",")
+    printVar <- paste(printVar, ind, "=", sep = "")
+    ind2 <- which(tbl[, ind] == 1)
+    valSol <- round(tbl[ind2, ncol(tbl)], 3)
+    printVar <- paste(printVar, valSol, sep = "")
+  }
+  str_sub(printVar, 2, 2) <- ""
+  printVar <- paste(printVar, ")", sep = "")
+  print(printVar)
 }
 
 twoPhaseSimplex <- function(tbl, cptNegBase, nbNonBase, C) {
@@ -163,7 +184,7 @@ twoPhaseSimplex <- function(tbl, cptNegBase, nbNonBase, C) {
     nonBase <- nonBaseDetection(tbl)
     nonBase <- append(nonBase, ncol(tbl))
     for (ind in c(1:nbNonBase)) {
-      posBases <- posBaseDetection(tbl)
+      posBases <- positiveBaseDetection(tbl)
       indBase <- which(posBases == ind)
       tbl[nrow(tbl), nonBase] <- tbl[nrow(tbl), nonBase] - C[1, ind] * tbl[indBase[1], nonBase]
     }
@@ -176,7 +197,7 @@ twoPhaseSimplex <- function(tbl, cptNegBase, nbNonBase, C) {
       tbl <- renameRows(tbl)
     }
     print(round(tbl, digits = 3))
-    print(printResult(tbl, nbNonBase))
+    return(tbl)
   } else {
     print("There are no results")
   }
@@ -184,11 +205,8 @@ twoPhaseSimplex <- function(tbl, cptNegBase, nbNonBase, C) {
 }
 
 simplex <- function(tbl) {
-  nbNonBase <- ncol(tbl) - 2
+  nbNonBase <- ncol(tbl) - nrow(tbl)
 
-  tbl <- createTable(tbl)
-
-  tbl <- cbind(tbl[, 1:(ncol(tbl) - 2)], tbl[, (ncol(tbl))]) # erase the inequality column
   tbl[nrow(tbl), ncol(tbl)] <- 0 # put the 0 for the Z-0
   doubleSimplex <- 0
   cptNegBase <- 0
@@ -220,27 +238,35 @@ simplex <- function(tbl) {
     }
   }
   if (doubleSimplex == 1) { # erase artificial variables
-    tbl <- twoPhaseSimplex(tbl, cptNegBase, nbNonBase, C)
+    return(twoPhaseSimplex(tbl, cptNegBase, nbNonBase, C))
   } else {
     return(tbl)
   }
 }
 
+searchMultipleSolution <- function(tbl, nbNonBase) {
+  nonBaseInd <- nonBaseDetection(tbl)
+  for (ind in nonBaseInd) {
+    if (tbl[nrow(tbl), ind] == 0) {
+      print("new solution")
+      slct <- selectFromCol(tbl, ind)
+      tbl <- gauss_pivot(tbl, slct[1], slct[2])
+      tbl <- renameRows(tbl)
+      print(tbl)
+      printResult(tbl, nbNonBase)
+    }
+  }
+}
+
 displayResult <- function() {
   tbl <- read.delim(file.choose(), header = FALSE, sep = " ") # store in a table the input file
+  tbl <- createTable(tbl)
+  tbl <- cbind(tbl[, 1:(ncol(tbl) - 2)], tbl[, (ncol(tbl))]) # erase the inequality column
+
   tbl <- simplex(tbl)
   nbNonBase <- ncol(tbl) - nrow(tbl)
-  printVar <- "("
-  for (ind in c(1:nbNonBase)) {
-    printVar <- paste(printVar, "x", sep = ",")
-    printVar <- paste(printVar, ind, "=", sep = "")
-    ind2 <- which(tbl[, ind] == 1)
-    valSol <- round(tbl[ind2, ncol(tbl)], 3)
-    printVar <- paste(printVar, valSol, sep = "")
-  }
-  str_sub(printVar, 2, 2) <- ""
-  printVar <- paste(printVar, ")", sep = "")
-  print(printVar)
+  printResult(tbl, nbNonBase)
+  searchMultipleSolution(tbl, nbNonBase)
 }
 
 displayResult()
