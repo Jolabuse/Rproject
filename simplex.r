@@ -48,20 +48,6 @@ addInvNegBaseCol <- function(tbl, ind) { # invert the values of the ind row and 
   tbl <- cbind(tbl[, 1:(ncol(tbl) - 2)], bCol, tbl[, (ncol(tbl) - 1):ncol(tbl)])
 }
 
-printResult <- function(tbl, nbNonBase) {
-  printVar <- "("
-  for (ind in c(1:nbNonBase)) {
-    printVar <- paste(printVar, "x", sep = ",")
-    printVar <- paste(printVar, ind, "=", sep = "")
-    ind2 <- which(tbl[, ind] == 1)
-    valSol <- round(tbl[ind2, ncol(tbl)], 3)
-    printVar <- paste(printVar, valSol, sep = "")
-  }
-  str_sub(printVar, 2, 2) <- ""
-  printVar <- paste(printVar, ")", sep = "")
-  return(printVar)
-}
-
 
 posBaseDetection <- function(tbl) {
   bases <- vector(length = nrow(tbl) - 1)
@@ -198,8 +184,6 @@ twoPhaseSimplex <- function(tbl, cptNegBase, nbNonBase, C) {
 }
 
 simplex <- function(tbl) {
-  tbl <- read.delim(file.choose(), header = FALSE, sep = " ") # store in a table the input file
-
   nbNonBase <- ncol(tbl) - 2
 
   tbl <- createTable(tbl)
@@ -238,8 +222,25 @@ simplex <- function(tbl) {
   if (doubleSimplex == 1) { # erase artificial variables
     tbl <- twoPhaseSimplex(tbl, cptNegBase, nbNonBase, C)
   } else {
-    print(printResult(tbl, nbNonBase))
+    return(tbl)
   }
 }
 
-simplex()
+displayResult <- function() {
+  tbl <- read.delim(file.choose(), header = FALSE, sep = " ") # store in a table the input file
+  tbl <- simplex(tbl)
+  nbNonBase <- ncol(tbl) - nrow(tbl)
+  printVar <- "("
+  for (ind in c(1:nbNonBase)) {
+    printVar <- paste(printVar, "x", sep = ",")
+    printVar <- paste(printVar, ind, "=", sep = "")
+    ind2 <- which(tbl[, ind] == 1)
+    valSol <- round(tbl[ind2, ncol(tbl)], 3)
+    printVar <- paste(printVar, valSol, sep = "")
+  }
+  str_sub(printVar, 2, 2) <- ""
+  printVar <- paste(printVar, ")", sep = "")
+  print(printVar)
+}
+
+displayResult()
